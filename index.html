@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高雄飲料店美食地圖</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #e67e22;
+            --primary-hover: #d35400;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #2c3e50;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        /* 側邊欄樣式 */
+        #sidebar {
+            width: 400px;
+            height: 100%;
+            background: var(--card-bg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .header {
+            padding: 20px;
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 15px 20px;
+            background-color: white;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .search-box, .filter-box {
+            position: relative;
+        }
+
+        .search-box input, .filter-box select {
+            width: 100%;
+            padding: 10px 12px 10px 35px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .filter-box select {
+            padding-left: 35px;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 1em;
+        }
+
+        .search-box input:focus, .filter-box select:focus {
+            border-color: var(--primary-color);
+        }
+
+        .search-box i, .filter-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+
+        .counter {
+            font-size: 0.85rem;
+            color: #718096;
+            padding: 5px 20px;
+            background: #f1f5f9;
+        }
+
+        .shop-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 20px;
+        }
+
+        .shop-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .shop-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(230, 126, 34, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .shop-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shop-tag {
+            font-size: 0.75rem;
+            background-color: #feebc8;
+            color: #c05621;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+
+        .shop-info {
+            font-size: 0.85rem;
+            color: #4a5568;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .shop-comment {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 8px;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        /* 地圖區域樣式 */
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        /* Leaflet Popup 樣式優化 */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 5px;
+        }
+
+        .popup-container {
+            padding: 5px;
+            max-width: 250px;
+        }
+
+        .popup-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .popup-detail {
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            color: #4a5568;
+        }
+
+        .popup-comment {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #edf2f7;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column-reverse;
+            }
+
+            #sidebar {
+                width: 100%;
+                height: 45vh;
+            }
+
+            #map {
+                height: 55vh;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 側邊欄控制與列表 -->
+    <div id="sidebar">
+        <div class="header">
+            <h1><i class="fa-solid fa-glass-water"></i> 高雄飲料店地圖</h1>
+            <p>嚴選 25 間在地手搖與古早味名店資訊</p>
+        </div>
+
+        <div class="controls">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="搜尋店名、地址、關鍵字...">
+            </div>
+            <div class="filter-box">
+                <i class="fa-solid fa-location-dot"></i>
+                <select id="districtSelect">
+                    <option value="">全部區域</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="counter" id="storeCounter">顯示 25 家飲料店</div>
+
+        <div class="shop-list" id="shopList"></div>
+    </div>
+
+    <!-- 地圖呈現區 -->
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 嚴格對照 CSV 檔案之 25 筆真實數據（包含經緯度座標以供地圖繪製）
+        const drinkShops = [
+            {
+                "店名": "希望奶茶",
+                "區域": "苓雅區",
+                "電話": "07-3388011",
+                "地址": "高雄市苓雅區興中一路388號",
+                "評論": "榮獲高雄奶茶節獎項，鮮奶茶香濃純郁，內用加珍珠粉角免費。",
+                "lat": 22.61715,
+                "lng": 120.30252
+            },
+            {
+                "店名": "延陵奶茶",
+                "區域": "前鎮區",
+                "電話": "07-7211185",
+                "地址": "高雄市前鎮區瑞隆路541號",
+                "評論": "使用整罐高牧鮮奶，奶香濃郁且加珍珠仙草免費，CP值極高。",
+                "lat": 22.60331,
+                "lng": 120.32354
+            },
+            {
+                "店名": "丹醇研選",
+                "區域": "前鎮區",
+                "電話": "07-3347888",
+                "地址": "高雄市前鎮區廣西路482號",
+                "評論": "屏東萬丹自家牧場直營鮮乳，蜜香紅茶拿鐵與芋頭鮮乳口感順滑。",
+                "lat": 22.61385,
+                "lng": 120.30602
+            },
+            {
+                "店名": "流火茶坊",
+                "區域": "苓雅區",
+                "電話": "07-3343360",
+                "地址": "高雄市苓雅區林森二路87號",
+                "評論": "獨家開心果與酪梨奶蓋超有特色，Google 4.9星好評推薦。",
+                "lat": 22.62002,
+                "lng": 120.30554
+            },
+            {
+                "店名": "偷喝奶茶",
+                "區域": "鹽埕區",
+                "電話": "07-5612385",
+                "地址": "高雄市鹽埕區新樂街154號",
+                "評論": "鹽埕奶茶一條街名店，茶香大於奶味且甜度適中，打卡熱點。",
+                "lat": 22.62582,
+                "lng": 120.28213
+            },
+            {
+                "店名": "双妃奶茶",
+                "區域": "鹽埕區",
+                "電話": "07-5218300",
+                "地址": "高雄市鹽埕區新樂街173號",
+                "評論": "不加冰塊保證濃郁，買飲料加珍珠免費，古早味奶茶經典老店。",
+                "lat": 22.62591,
+                "lng": 120.28185
+            },
+            {
+                "店名": "玖玖茶舖",
+                "區域": "鹽埕區",
+                "電話": "07-5310979",
+                "地址": "高雄市鹽埕區新樂街119號",
+                "評論": "主打每日現熬冰糖白木耳奶茶，健康養生且胖胖瓶包裝超好拍。",
+                "lat": 22.62553,
+                "lng": 120.28312
+            },
+            {
+                "店名": "拾年茶事",
+                "區域": "左營區",
+                "電話": "07-5568890",
+                "地址": "高雄市左營區富民路331號",
+                "評論": "現萃茶包喝完可回沖，自製山茶花凍清爽回甘，奶蓋表現優異。",
+                "lat": 22.66014,
+                "lng": 120.30481
+            },
+            {
+                "店名": "神農本舖",
+                "區域": "三民區",
+                "電話": "07-2858881",
+                "地址": "高雄市三民區同愛街68號",
+                "評論": "高雄火車站老字號，近700種品項，「隨便泡」隱藏版特調最受學生喜愛。",
+                "lat": 22.63663,
+                "lng": 120.30205
+            },
+            {
+                "店名": "鄭家粉圓冰",
+                "區域": "前金區",
+                "電話": "07-2821010",
+                "地址": "高雄市前金區河南二路132號",
+                "評論": "傳承65年古早味，10元黑糖粉圓冰料多實在，在地CP值爆表選擇。",
+                "lat": 22.63351,
+                "lng": 120.29682
+            },
+            {
+                "店名": "芙奇茶苑",
+                "區域": "左營區",
+                "電話": "07-5508388",
+                "地址": "高雄市左營區富國路274號",
+                "評論": "首創「豆乳豆花」入手搖飲，口感扎實綿密，文青風極受好評。",
+                "lat": 22.65882,
+                "lng": 120.30584
+            },
+            {
+                "店名": "只有粉圓手作飲品專賣",
+                "區域": "前鎮區",
+                "電話": "07-3382881",
+                "地址": "高雄市前鎮區復興三路141號",
+                "評論": "手工黑糖粉圓越冰越Q彈，抹茶與鮮奶茶配料控必訪。",
+                "lat": 22.61102,
+                "lng": 120.30821
+            },
+            {
+                "店名": "品天然",
+                "區域": "左營區",
+                "電話": "07-5507988",
+                "地址": "高雄市左營區裕誠路378號",
+                "評論": "無糖低卡養生系飲料，使用甜菊葉自然甜，健康無負擔。",
+                "lat": 22.66103,
+                "lng": 120.30652
+            },
+            {
+                "店名": "漉滴滴 L'OR DE THÉ",
+                "區域": "三民區",
+                "電話": "07-3875843",
+                "地址": "高雄市三民區鼎華路208號",
+                "評論": "莊園級茶葉與松露起司奶霜，質感高且風味獨特。",
+                "lat": 22.65651,
+                "lng": 120.31824
+            },
+            {
+                "店名": "穀逯新鮮牛乳茶",
+                "區域": "鼓山區",
+                "電話": "0912-345678",
+                "地址": "高雄市鼓山區青海路342號",
+                "評論": "限量瓶裝，使用北海道四葉鮮乳配名茶，低甜度順口不膩。",
+                "lat": 22.65602,
+                "lng": 120.28851
+            },
+            {
+                "店名": "鹽埕小熊奶茶",
+                "區域": "鹽埕區",
+                "電話": "07-5210199",
+                "地址": "高雄市鹽埕區鹽埕街19號",
+                "評論": "可愛小熊造型瓶裝，彩虹小熊牆超熱門，奶茶節雙料得獎名店。",
+                "lat": 22.62681,
+                "lng": 120.28352
+            },
+            {
+                "店名": "三興堂手沖泰奶",
+                "區域": "新興區",
+                "電話": "0987-654321",
+                "地址": "高雄市新興區新田路167號",
+                "評論": "正宗手沖現調泰式奶茶，茶香濃厚，2023奶茶節最佳風味獎。",
+                "lat": 22.62083,
+                "lng": 120.30154
+            },
+            {
+                "店名": "心愛粉圓涼水店",
+                "區域": "楠梓區",
+                "電話": "0912-888999",
+                "地址": "高雄市楠梓區楠梓新路95號",
+                "評論": "楠梓在地黑糖粉圓老店，手炒黑糖搭鮮奶Q彈療癒。",
+                "lat": 22.72952,
+                "lng": 120.32881
+            },
+            {
+                "店名": "小雅茶飲",
+                "區域": "三民區",
+                "電話": "07-3802423",
+                "地址": "高雄市三民區建興路299號",
+                "評論": "高雄芋頭西米露代表老店，真材實料芋泥超綿密，在地人強推。",
+                "lat": 22.64682,
+                "lng": 120.32251
+            },
+            {
+                "店名": "茶哺茶哺",
+                "區域": "前鎮區",
+                "電話": "07-3381122",
+                "地址": "高雄市前鎮區林森三路126號",
+                "評論": "日式靜岡抹茶與京都焙茶專賣，加入黑糖蕨餅創意十足。",
+                "lat": 22.61452,
+                "lng": 120.30721
+            },
+            {
+                "店名": "樺達奶茶 (鹽埕總店)",
+                "區域": "鹽埕區",
+                "電話": "07-5512151",
+                "地址": "高雄市鹽埕區新樂街99號",
+                "評論": "高雄知名老字號奶茶創始店，紅茶搭配光泉鮮乳，風味經典流傳多年。",
+                "lat": 22.62521,
+                "lng": 120.28382
+            },
+            {
+                "店名": "麻古茶坊 (裕誠店)",
+                "區域": "左營區",
+                "電話": "07-5573888",
+                "地址": "高雄市左營區裕誠路420號",
+                "評論": "果粒茶系列創始名店，楊枝甘露與芝芝葡萄果粒豐富深受喜愛。",
+                "lat": 22.66124,
+                "lng": 120.30521
+            },
+            {
+                "店名": "烏弄原生茶飲 (富國店)",
+                "區域": "左營區",
+                "電話": "07-5509588",
+                "地址": "高雄市左營區富國路222號",
+                "評論": "主打原片台灣茶與天然配料，杏仁凍與冬片仔茶搭配口感清脆甘甜。",
+                "lat": 22.65752,
+                "lng": 120.30591
+            },
+            {
+                "店名": "八曜和茶 (高雄文山店)",
+                "區域": "鳳山區",
+                "電話": "07-7778988",
+                "地址": "高雄市鳳山區青年路二段584號",
+                "評論": "日式和風茶飲特色品牌，八曜和茶與柚香覺醒清爽解膩人氣極高。",
+                "lat": 22.64201,
+                "lng": 120.35251
+            },
+            {
+                "店名": "老江紅茶牛奶 (總店)",
+                "區域": "新興區",
+                "電話": "07-2877317",
+                "地址": "高雄市新興區南台路51號",
+                "評論": "創立於1953年的古早味名店，古法炭燒紅茶搭配鮮乳風味獨特。",
+                "lat": 22.63182,
+                "lng": 120.30052
+            }
+        ];
+
+        // 初始化地圖（中心設於高雄市）
+        const map = L.map('map').setView([22.6300, 120.3000], 13);
+
+        // 載入 OpenStreetMap 圖資
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const markers = [];
+        const shopListElement = document.getElementById('shopList');
+        const districtSelect = document.getElementById('districtSelect');
+        const searchInput = document.getElementById('searchInput');
+        const storeCounter = document.getElementById('storeCounter');
+
+        // 初始化行政區選單選項
+        function initDistrictFilter() {
+            const districts = [...new Set(drinkShops.map(shop => shop.區域))];
+            districts.forEach(dist => {
+                const opt = document.createElement('option');
+                opt.value = dist;
+                opt.textContent = dist;
+                districtSelect.appendChild(opt);
+            });
+        }
+
+        // 建立地圖標記與彈窗
+        function renderMapAndList(shops) {
+            // 清除現有標記
+            markers.forEach(m => map.removeLayer(m));
+            markers.length = 0;
+            shopListElement.innerHTML = '';
+
+            storeCounter.textContent = `顯示 ${shops.length} 家飲料店`;
+
+            shops.forEach((shop, index) => {
+                // 1. 建立地圖 Marker
+                const googleMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shop.地址)}`;
+                const popupContent = `
+                    <div class="popup-container">
+                        <div class="popup-title">${shop.店名}</div>
+                        <div class="popup-detail"><i class="fa-solid fa-phone"></i> ${shop.電話}</div>
+                        <div class="popup-detail"><i class="fa-solid fa-location-dot"></i> ${shop.地址}</div>
+                        <div class="popup-comment">${shop.評論}</div>
+                        <a href="${googleMapUrl}" target="_blank" class="nav-btn"><i class="fa-solid fa-diamond-turn-right"></i> 開啟 Google 地圖導航</a>
+                    </div>
+                `;
+
+                const marker = L.marker([shop.lat, shop.lng])
+                    .addTo(map)
+                    .bindPopup(popupContent);
+                
+                markers.push(marker);
+
+                // 2. 建立側邊欄卡片
+                const card = document.createElement('div');
+                card.className = 'shop-card';
+                card.innerHTML = `
+                    <div class="shop-name">
+                        <span>${shop.店名}</span>
+                        <span class="shop-tag">${shop.區域}</span>
+                    </div>
+                    <div class="shop-info"><i class="fa-solid fa-phone"></i> ${shop.電話}</div>
+                    <div class="shop-info"><i class="fa-solid fa-location-dot"></i> ${shop.地址}</div>
+                    <div class="shop-comment">${shop.評論}</div>
+                `;
+
+                // 卡片點擊事件：移至該店家並開啟地圖彈窗
+                card.addEventListener('click', () => {
+                    map.flyTo([shop.lat, shop.lng], 16, { duration: 1 });
+                    marker.openPopup();
+                });
+
+                shopListElement.appendChild(card);
+            });
+        }
+
+        // 篩選與搜尋邏輯
+        function filterShops() {
+            const selectedDistrict = districtSelect.value;
+            const searchText = searchInput.value.trim().toLowerCase();
+
+            const filtered = drinkShops.filter(shop => {
+                const matchDistrict = !selectedDistrict || shop.區域 === selectedDistrict;
+                const matchSearch = !searchText || 
+                    shop.店名.toLowerCase().includes(searchText) ||
+                    shop.地址.toLowerCase().includes(searchText) ||
+                    shop.電話.includes(searchText) ||
+                    shop.評論.toLowerCase().includes(searchText);
+
+                return matchDistrict && matchSearch;
+            });
+
+            renderMapAndList(filtered);
+        }
+
+        // 監聽輸入事件
+        districtSelect.addEventListener('change', filterShops);
+        searchInput.addEventListener('input', filterShops);
+
+        // 初始執行
+        initDistrictFilter();
+        renderMapAndList(drinkShops);
+    </script>
+</body>
+</html>
